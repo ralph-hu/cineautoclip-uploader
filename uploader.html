@@ -21,11 +21,6 @@
         <h1 class="text-3xl font-bold mb-2 text-center text-indigo-400">CineAutoClip</h1>
         <p class="text-gray-400 mb-6 text-center">电影自动化剪辑工作流 - 上传入口</p>
 
-        <div class="mb-4">
-            <label for="n8n-webhook-url" class="block text-sm font-medium text-gray-300 mb-1">n8n 授权 Webhook URL</label>
-            <input type="text" id="n8n-webhook-url" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="请粘贴 n8n 生成上传许可的 Webhook URL">
-        </div>
-
         <div class="mb-6">
             <label for="video-file" class="block text-sm font-medium text-gray-300 mb-1">选择电影文件</label>
             <input type="file" id="video-file" class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer">
@@ -45,7 +40,9 @@
     </div>
 
     <script>
-        const n8nWebhookUrlInput = document.getElementById('n8n-webhook-url');
+        // --- 配置: 将您的 n8n Webhook URL 硬编码在这里 ---
+        const N8N_AUTHORIZATION_URL = 'http://ec2-18-225-37-209.us-east-2.compute.amazonaws.com:5678/webhook/generate-oss-upload-url';
+        
         const videoFileInput = document.getElementById('video-file');
         const uploadButton = document.getElementById('upload-button');
         const statusContainer = document.getElementById('status-container');
@@ -54,20 +51,13 @@
         const progressBarInner = document.getElementById('progress-bar-inner');
         const progressText = document.getElementById('progress-text');
 
-        // 在页面加载时，尝试从 localStorage 读取已保存的 Webhook URL
-        n8nWebhookUrlInput.value = localStorage.getItem('n8nWebhookUrl') || '';
-
         uploadButton.addEventListener('click', async () => {
-            const webhookUrl = n8nWebhookUrlInput.value.trim();
             const file = videoFileInput.files[0];
 
-            if (!webhookUrl || !file) {
-                alert('请填写 Webhook URL 并选择文件！');
+            if (!N8N_AUTHORIZATION_URL || !file) {
+                alert('请选择文件！(Webhook URL 已配置)');
                 return;
             }
-
-            // 保存 Webhook URL 到 localStorage，方便下次使用
-            localStorage.setItem('n8nWebhookUrl', webhookUrl);
 
             uploadButton.disabled = true;
             statusContainer.classList.remove('hidden');
@@ -78,7 +68,7 @@
             try {
                 // --- 步骤 1.1: 请求上传许可 ---
                 statusText.textContent = '1/3: 正在向 n8n 请求上传许可...';
-                const response = await fetch(`${webhookUrl}?fileName=${encodeURIComponent(file.name)}`);
+                const response = await fetch(`${N8N_AUTHORIZATION_URL}?fileName=${encodeURIComponent(file.name)}`);
 
                 if (!response.ok) {
                     throw new Error(`获取上传许可失败: ${response.statusText}`);
