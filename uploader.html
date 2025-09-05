@@ -4,16 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CineAutoClip - 视频上传</title>
-    <!-- 使用 Tailwind CSS 美化界面 -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
     <style>
-        /* 自定义字体和过渡效果 */
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .progress-bar-inner {
-            transition: width 0.3s ease-in-out;
-        }
+        body { font-family: 'Inter', sans-serif; }
+        .progress-bar-inner { transition: width 0.3s ease-in-out; }
     </style>
 </head>
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
@@ -40,9 +34,10 @@
     </div>
 
     <script>
-        // --- 配置: 将您的 n8n Webhook URL 硬编码在这里 ---
-        const N8N_AUTHORIZATION_URL = 'http://ec2-18-225-37-209.us-east-2.compute.amazonaws.com:5678/webhook/generate-oss-upload-url';
-        
+        // --- 配置: 您的 n8n 授权 Webhook URL (已更新为 HTTPS) ---
+        const N8N_AUTHORIZATION_URL = '[https://n8n.hyl.me.uk/webhook/generate-oss-upload-url](https://n8n.hyl.me.uk/webhook/generate-oss-upload-url)';
+
+        // ... (后续JS代码无需修改) ...
         const videoFileInput = document.getElementById('video-file');
         const uploadButton = document.getElementById('upload-button');
         const statusContainer = document.getElementById('status-container');
@@ -53,12 +48,10 @@
 
         uploadButton.addEventListener('click', async () => {
             const file = videoFileInput.files[0];
-
-            if (!N8N_AUTHORIZATION_URL || !file) {
-                alert('请选择文件！(Webhook URL 已配置)');
+            if (!file) {
+                alert('请选择文件！');
                 return;
             }
-
             uploadButton.disabled = true;
             statusContainer.classList.remove('hidden');
             progressBar.classList.add('hidden');
@@ -66,25 +59,17 @@
             statusText.textContent = '初始化...';
 
             try {
-                // --- 步骤 1.1: 请求上传许可 ---
                 statusText.textContent = '1/3: 正在向 n8n 请求上传许可...';
                 const response = await fetch(`${N8N_AUTHORIZATION_URL}?fileName=${encodeURIComponent(file.name)}`);
+                if (!response.ok) throw new Error(`获取上传许可失败: ${response.statusText}`);
 
-                if (!response.ok) {
-                    throw new Error(`获取上传许可失败: ${response.statusText}`);
-                }
-                
                 const data = await response.json();
                 const presignedUploadUrl = data.url;
+                if (!presignedUploadUrl) throw new Error('n8n 未返回有效的预签名 URL。');
 
-                if (!presignedUploadUrl) {
-                    throw new Error('n8n 未返回有效的预签名 URL。');
-                }
-                
                 statusText.textContent = '2/3: 许可获取成功，正在上传文件至阿里云 OSS...';
                 progressBar.classList.remove('hidden');
-                
-                // --- 步骤 1.3: 直传文件至阿里云 OSS ---
+
                 await uploadFile(presignedUploadUrl, file);
 
                 statusText.textContent = '3/3: 上传成功！后端工作流已自动触发。';
@@ -99,12 +84,10 @@
             }
         });
 
-        // 使用 XMLHttpRequest 来获取上传进度
         function uploadFile(url, file) {
             return new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
                 xhr.open('PUT', url, true);
-                
                 xhr.upload.onprogress = (event) => {
                     if (event.lengthComputable) {
                         const percentComplete = (event.loaded / event.total) * 100;
@@ -112,19 +95,8 @@
                         progressText.textContent = `${Math.round(percentComplete)}% (${(event.loaded / 1024 / 1024).toFixed(2)}MB / ${(event.total / 1024 / 1024).toFixed(2)}MB)`;
                     }
                 };
-
-                xhr.onload = () => {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        resolve(xhr.response);
-                    } else {
-                        reject(new Error(`上传至 OSS 失败，状态码: ${xhr.status}`));
-                    }
-                };
-
-                xhr.onerror = () => {
-                    reject(new Error('网络错误导致上传失败。'));
-                };
-
+                xhr.onload = () => (xhr.status >= 200 && xhr.status < 300) ? resolve(xhr.response) : reject(new Error(`上传至 OSS 失败，状态码: ${xhr.status}`));
+                xhr.onerror = () => reject(new Error('网络错误导致上传失败。'));
                 xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
                 xhr.send(file);
             });
@@ -132,4 +104,3 @@
     </script>
 </body>
 </html>
-
