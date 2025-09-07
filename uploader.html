@@ -1,192 +1,131 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CineAutoClip - 视频上传</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CineAutoClip · S3 直传 Uploader</title>
   <style>
-    body { font-family: "Inter", sans-serif; }
-    .spinner { border: 3px solid transparent; border-top-color: white; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    :root { --bg:#0b0c10; --card:#12141a; --accent:#4da3ff; --ok:#2ecc71; --warn:#ffb020; --err:#ff4757; --text:#e6edf3; --muted:#9aa4b2; }
+    *{box-sizing:border-box} body{margin:0; background:var(--bg); color:var(--text); font:16px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,PingFang SC,Microsoft Yahei,"Helvetica Neue",Arial}
+    .wrap{max-width:680px; margin:48px auto; padding:0 16px}
+    .card{background:var(--card); border:1px solid #1d2330; border-radius:16px; padding:24px; box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    h1{margin:0 0 16px; font-size:22px}
+    p.tip{margin:6px 0 18px; color:var(--muted)}
+    .row{display:flex; gap:12px; align-items:center; margin:12px 0}
+    input[type=file]{flex:1; padding:10px; border:1px dashed #2b3345; border-radius:10px; background:#0f121a; color:var(--muted)}
+    .btn{appearance:none; border:0; background:var(--accent); color:#071018; font-weight:700; padding:10px 16px; border-radius:10px; cursor:pointer}
+    .btn[disabled]{opacity:.5; cursor:not-allowed}
+    .prog{height:10px; width:100%; background:#101522; border-radius:999px; overflow:hidden; border:1px solid #1e2636}
+    .bar{height:100%; width:0%; background:linear-gradient(90deg,#5fb0ff,#4da3ff,#3a93ff); transition:width .1s}
+    .kv{display:grid; grid-template-columns:120px 1fr; gap:8px; margin-top:14px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:13px; color:#c9d1d9}
+    .kv .k{color:var(--muted)}
+    .stat{margin-top:14px; padding:10px 12px; border-radius:10px; background:#0f131c; border:1px solid #1c2535; color:#c9d1d9}
+    .ok{color:var(--ok)} .warn{color:var(--warn)} .err{color:var(--err)}
+    small{color:var(--muted)}
+    .grid{display:grid; grid-template-columns:1fr auto; gap:12px}
   </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
-  <div class="bg-white shadow-xl rounded-2xl p-8 w-full max-w-md">
-    <!-- Header -->
-    <div class="flex flex-col items-center mb-6">
-      <svg class="w-12 h-12 text-indigo-500 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a1 1 0 001 1h3m10-2v1a1 1 0 01-1 1h-3m-6 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2z" />
-      </svg>
-      <h1 class="text-2xl font-bold text-gray-800">CineAutoClip</h1>
-      <p class="text-gray-500 text-sm mt-1">电影自动化剪辑 - 上传入口</p>
-    </div>
-    <!-- Upload Zone -->
-    <label id="drop-zone" for="video-file" class="w-full cursor-pointer border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center p-8 text-center hover:border-indigo-400 hover:bg-indigo-50 transition">
-      <svg class="w-12 h-12 text-gray-400 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4a1 1 0 011-1h8a1 1 0 011 1v12M7 16h10M7 16l-2 2m12-2l2 2" />
-      </svg>
-      <p class="text-gray-600">点击选择或拖拽文件到此处</p>
-      <p id="file-name-display" class="text-indigo-500 text-sm mt-1"></p>
-    </label>
-    <input type="file" id="video-file" class="hidden" />
-    <!-- Upload Button -->
-    <button id="upload-button" class="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center transition disabled:bg-gray-400 disabled:cursor-not-allowed">
-      <span id="button-text">开始上传</span>
-      <div id="button-spinner" class="spinner ml-3 hidden"></div>
-    </button>
-    <!-- Status -->
-    <div id="status-container" class="mt-6 hidden">
-      <div class="flex items-center justify-center mb-2">
-        <div id="status-icon" class="mr-2"></div>
-        <p id="status-text" class="text-gray-700"></p>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>上传视频到 S3（直传）</h1>
+      <p class="tip">支持 <b>.mp4 / .mov</b>；默认限制大小 <span id="limitLabel">2 GB</span>。上传前会先向 Lambda 获取预签名 URL，然后使用 <code>PUT</code> 直传到 S3。</p>
+
+      <div class="grid">
+        <input id="file" type="file" accept=".mp4,.mov" />
+        <button id="btn" class="btn">上传</button>
       </div>
-      <div id="progress-bar" class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-        <div id="progress-bar-inner" class="bg-indigo-500 h-3 w-0 transition-all duration-300"></div>
+
+      <div class="row">
+        <div class="prog" style="flex:1"><div id="bar" class="bar"></div></div>
+        <div style="width:70px; text-align:right"><span id="pct">0%</span></div>
       </div>
-      <p id="progress-text" class="text-xs text-gray-500 mt-1 text-right"></p>
+
+      <div class="stat" id="stat"><small>等待选择文件…</small></div>
+
+      <div class="kv">
+        <div class="k">文件名</div><div id="kv-name">-</div>
+        <div class="k">大小</div><div id="kv-size">-</div>
+        <div class="k">预签名 URL</div><div id="kv-url"><small>-</small></div>
+        <div class="k">S3 目标</div><div id="kv-bkt">-</div>
+      </div>
     </div>
+
+    <p class="tip" style="margin-top:14px">
+      <small>注意：请确保 S3 桶 CORS 允许 <code>PUT</code> 且来源包含你的站点；Lambda Function URL CORS 需允许 <code>GET, OPTIONS</code>。直传时请不要手动设置 <code>Content-Type</code> 头（除非 Lambda 端也固定了同样的 <code>ContentType</code>）。</small>
+    </p>
   </div>
-  <script>
-    const DEBUG = true; // ⚡ 调试开关，生产环境改成 false
-    const N8N_AUTHORIZATION_URL = "https://n8n.hyl.me.uk/webhook/generate-oss-upload-url";
 
-    const videoFileInput = document.getElementById("video-file");
-    const uploadButton = document.getElementById("upload-button");
-    const buttonText = document.getElementById("button-text");
-    const buttonSpinner = document.getElementById("button-spinner");
-    const fileNameDisplay = document.getElementById("file-name-display");
-    const dropZone = document.getElementById("drop-zone");
-    const statusContainer = document.getElementById("status-container");
-    const statusText = document.getElementById("status-text");
-    const statusIcon = document.getElementById("status-icon");
-    const progressBarInner = document.getElementById("progress-bar-inner");
-    const progressText = document.getElementById("progress-text");
+<script>
+/** ======= 需要你替换的配置 ======= **/
+const FUNCTION_URL = "https://rllqapqieflo5pv3yyealvqvru0xprvl.lambda-url.us-east-2.on.aws/";  // 例如 https://xxx.lambda-url.us-east-2.on.aws/
+const MAX_SIZE_MB = 2048;                    // 前端体积限制（可改），与后端无强绑定
+/** ================================== **/
 
-    const ICONS = {
-      success: `<svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 00-1.414 0L9 11.586 6.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l7-7a1 1 0 000-1.414z" clip-rule="evenodd" /></svg>`,
-      error: `<svg class="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>`,
-      spinner: `<div class="spinner"></div>`
+const $ = sel => document.querySelector(sel);
+const elFile = $('#file'), elBtn = $('#btn'), elBar = $('#bar'), elPct = $('#pct');
+const elStat = $('#stat'), elName = $('#kv-name'), elSize = $('#kv-size'), elURL = $('#kv-url'), elBkt = $('#kv-bkt');
+$('#limitLabel').textContent = `${MAX_SIZE_MB} GB`.replace(' 0 GB',' 0GB');
+
+function fmtBytes(n){
+  if(!Number.isFinite(n)) return '-';
+  const u=['B','KB','MB','GB','TB']; let i=0; while(n>=1024&&i<u.length-1){n/=1024;i++} 
+  return `${n.toFixed( (i<2)?0:2 )} ${u[i]}`;
+}
+function setProgress(p){ elBar.style.width = `${p}%`; elPct.textContent = `${p|0}%`; }
+function note(html,cls=''){ elStat.innerHTML = `<span class="${cls}">${html}</span>`; }
+
+elBtn.addEventListener('click', async () => {
+  try{
+    const f = elFile.files?.[0];
+    if(!f){ note('请先选择文件', 'warn'); return; }
+    elName.textContent = f.name; elSize.textContent = fmtBytes(f.size); setProgress(0);
+
+    // 基础校验
+    const okExt = /\.(mp4|mov)$/i.test(f.name);
+    if(!okExt){ note('只允许 .mp4 / .mov', 'err'); return; }
+    const max = MAX_SIZE_MB * 1024 * 1024;
+    if(f.size > max){ note(`文件过大（>${MAX_SIZE_MB}GB）`, 'err'); return; }
+
+    // 1) 向 Lambda 获取预签名 URL
+    note('正在请求预签名 URL…');
+    const q = new URLSearchParams({ fileName: f.name });
+    const r = await fetch(`${FUNCTION_URL}?${q}`, { method:'GET' });
+    if(!r.ok){ throw new Error('获取预签名失败：' + r.status); }
+    const { uploadUrl, bucket, expires } = await r.json();
+    if(!uploadUrl) throw new Error('返回中缺少 uploadUrl');
+
+    elURL.innerHTML = `<small>${uploadUrl.split('?')[0]}?...</small>`;
+    elBkt.textContent = bucket || '-';
+    note(`已获取预签名（${expires || 900}s），开始上传…`);
+
+    // 2) 使用预签名 URL 直传到 S3（PUT）
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', uploadUrl, true);
+
+    // 不要额外设置 Content-Type；若你在 Lambda 端固定了 ContentType，这里必须设置同样的
+    // xhr.setRequestHeader('Content-Type', 'video/mp4');
+
+    xhr.upload.onprogress = (e)=>{ if(e.lengthComputable){ setProgress((e.loaded/e.total)*100); } };
+    xhr.onload = ()=> {
+      if(xhr.status >= 200 && xhr.status < 300){
+        setProgress(100);
+        note('上传成功 ✅，可以返回页面或等待后续处理。', 'ok');
+      }else{
+        note(`上传失败：HTTP ${xhr.status} ${xhr.statusText}`, 'err');
+      }
+      elBtn.disabled = false;
     };
+    xhr.onerror = ()=> { note('网络错误，上传中断', 'err'); elBtn.disabled = false; };
+    elBtn.disabled = true;
+    xhr.send(f);
 
-    function logDebug(...args) {
-      if (DEBUG) console.log("[Uploader Debug]", ...args);
-    }
-
-    function handleFileSelect(files) {
-      if (files.length > 0) {
-        const file = files[0];
-        videoFileInput.files = files;
-        fileNameDisplay.textContent = `${file.name} (${(file.size/1024/1024).toFixed(2)} MB)`;
-        logDebug("Selected file:", file.name, file.size, "bytes");
-      } else {
-        fileNameDisplay.textContent = "";
-      }
-    }
-
-    videoFileInput.addEventListener("change", () => handleFileSelect(videoFileInput.files));
-
-    ["dragenter", "dragover"].forEach(eventName => {
-      dropZone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        dropZone.classList.add("border-indigo-400", "bg-indigo-50");
-      });
-    });
-
-    ["dragleave", "drop"].forEach(eventName => {
-      dropZone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        dropZone.classList.remove("border-indigo-400", "bg-indigo-50");
-      });
-    });
-
-    dropZone.addEventListener("drop", (e) => {
-      if (e.dataTransfer.files.length > 0) {
-        handleFileSelect(e.dataTransfer.files);
-      }
-    });
-
-    function updateStatus(text, icon, progressVisible = true) {
-      statusContainer.classList.remove("hidden");
-      statusText.textContent = text;
-      statusIcon.innerHTML = icon;
-      document.getElementById("progress-bar").style.display = progressVisible ? 'block' : 'none';
-      if (!progressVisible) {
-        progressBarInner.style.width = "0%";
-        progressText.textContent = "";
-      }
-      logDebug("Status update:", text);
-    }
-
-    uploadButton.addEventListener("click", async () => {
-      const file = videoFileInput.files[0];
-      if (!file) {
-        alert("请选择一个文件！");
-        return;
-      }
-      uploadButton.disabled = true;
-      buttonText.textContent = "上传中";
-      buttonSpinner.classList.remove("hidden");
-
-      try {
-        updateStatus("请求上传许可中...", ICONS.spinner, false);
-        const response = await fetch(`${N8N_AUTHORIZATION_URL}?fileName=${encodeURIComponent(file.name)}`);
-        if (!response.ok) throw new Error(`获取上传许可失败: ${response.statusText}`);
-
-        const data = await response.json();
-        const presignedUploadUrl = data.url;
-        if (!presignedUploadUrl) throw new Error("无效的预签名 URL");
-
-        logDebug("Presigned URL:", presignedUploadUrl);
-
-        updateStatus("正在上传文件...", ICONS.spinner, true);
-        await uploadFile(presignedUploadUrl, file);
-
-        updateStatus("上传成功！后端工作流已触发。", ICONS.success, true);
-        progressBarInner.style.width = "100%";
-        progressText.textContent = "100%";
-        buttonText.textContent = "完成";
-        buttonSpinner.classList.add("hidden");
-        uploadButton.classList.replace("bg-indigo-600", "bg-green-500");
-        logDebug("Upload finished:", file.name);
-      } catch (err) {
-        updateStatus(`上传失败: ${err.message}`, ICONS.error, false);
-        buttonText.textContent = "重试";
-        buttonSpinner.classList.add("hidden");
-        uploadButton.classList.replace("bg-indigo-600", "bg-red-500");
-        logDebug("Upload error:", err);
-      } finally {
-        uploadButton.disabled = false;
-      }
-    });
-
-    function uploadFile(url, file) {
-      return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("PUT", url, true);
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            const percent = (e.loaded / e.total) * 100;
-            progressBarInner.style.width = percent + "%";
-            progressText.textContent = `${Math.round(percent)}% (${(e.loaded/1024/1024).toFixed(2)} / ${(e.total/1024/1024).toFixed(2)} MB)`;
-            logDebug(`Progress: ${percent.toFixed(2)}%`);
-          }
-        };
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve();
-          } else {
-            reject(new Error(`状态码: ${xhr.status}`));
-          }
-        };
-        xhr.onerror = () => reject(new Error("网络错误"));
-        xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-        xhr.send(file);
-      });
-    }
-  </script>
+  }catch(err){
+    console.error(err);
+    note(`出错：${err.message || err}`, 'err');
+    elBtn.disabled = false;
+  }
+});
+</script>
 </body>
 </html>
